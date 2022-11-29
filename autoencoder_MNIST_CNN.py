@@ -10,18 +10,22 @@ from torchvision import transforms, datasets
 
 from xyz_util import *
 
+THIS_FILE_NAME = os.path.basename(__file__).strip('.py')
+
 # ===
 # 配置及超参数
 # ===
 
 fix_seed(42)
 
+READ_MODEL_PATH = f'./model/{THIS_FILE_NAME}__epoch100.pth'
+SAVE_MODEL_PATH = f'./model/{THIS_FILE_NAME}__epoch100.pth'
 READ_MODEL_PATH = False
-SAVE_MODEL_PATH = './model/autoencoder_MNIST_CNN.pth'
+# SAVE_MODEL_PATH = False
 FORCE_CPU = False
 device = "cuda" if torch.cuda.is_available() and not FORCE_CPU else "cpu"
 
-N_EPOCH = 50
+N_EPOCH = 2
 BATCH_SIZE = 128
 
 lr = 1e-2
@@ -88,11 +92,13 @@ else:
 # ===
 # 训练
 # ===
-
+    loss_epochs = []
     for epoch in range(N_EPOCH):
         if epoch in [N_EPOCH * 0.25, epoch * 0.5]:
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= 0.1
+
+        loss_in_epoch = []
 
         for img_batch, _ in train_loader:
             img_batch: torch.Tensor
@@ -104,11 +110,23 @@ else:
             optimizer.zero_grad()  # 清零
             loss.backward()  # 反向
             optimizer.step()  # 传播
-        print(f'epoch={epoch}, loss={loss}')
+
+            loss_in_epoch.append(loss.data.cpu())
+
+        print(f'epoch={epoch}, loss={np.mean(loss_in_epoch)}')
+        loss_epochs.append(np.mean(loss_in_epoch))
 
     if SAVE_MODEL_PATH:
         torch.save(model.state_dict(), SAVE_MODEL_PATH)
 
+# ===
+# 运行时数据保存
+# ===
+
+fig = plt.figure()
+plt.plot(loss_epochs)
+plt.show()
+fig.savefig(f'./runtime/loss_epochs/{THIS_FILE_NAME}.png')
 
 # ===
 # 其他
@@ -121,11 +139,19 @@ def to_img(x: torch.Tensor) -> torch.Tensor:
     return x
 
 
-test_code = torch.FloatTensor([[1.19, -3.36, 2.06]]).to(device)
-test_decode = model.decoder(test_code)
-decode_img = to_img(test_decode).squeeze()
-decode_img = decode_img.data.cpu().numpy() * 255
-plt.imshow(decode_img.astype('uint8'), cmap='gray')
-plt.show()
+for img_batch, _ in train_loader:
+    img = img_batch[0]
+    img = to_img(img).squeeze()
+    img = img.data.numpy() * 255
+    plt.imshow(img.astype('uint8'), cmap='gray')
+    plt.show()
+    img_batch = img_batch.to(device)
+    _, decode_imgs = model(img_batch)
+    decode_img = to_img(decode_imgs).squeeze()
+    decode_img = decode_img.data.cpu().numpy() * 255
+    plt.imshow(decode_img[0].astype('uint8'), cmap='gray')
+    plt.show()
+    break
+
 
 print("运行完毕")

@@ -1,9 +1,11 @@
+import json
+import os
+import random
 from collections import deque
+
 import numpy as np
 import torch
-import random
-import os
-
+from torch import nn
 
 def fix_seed(seed):
     """
@@ -42,6 +44,29 @@ def shingle(sequence, size):
         yield np.asarray(window)
 
 
+def save_model_to_json(model: nn.Module, path: str):
+    """
+    把模型保存成json
+    :param model:
+    :param path:
+    :return:
+    """
+    model_dict = model.state_dict()
+    for key in model_dict:
+        model_dict[key] = model_dict[key].tolist()
+    with open(path, 'w') as f:
+        json.dump(model_dict, f)
 
 
-
+def load_model_from_json(path: str):
+    """
+    从json中读模型字典
+    TODO: 直接返回模型
+    :param path:
+    :return:
+    """
+    with open(path, 'r') as f:
+        model_dict = json.load(f)
+    for key in model_dict:
+        model_dict[key] = torch.Tensor(model_dict[key])
+    return model_dict
